@@ -1,9 +1,11 @@
-use actix_web::{get, web, App, HttpResponse, HttpServer};
+use actix_web::{get, web, App, HttpServer, middleware::Logger};
+use env_logger::Env;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+
+mod health;
 mod todo;
-use todo::service;
 
 struct AppState {
     todo_entries: Mutex<Vec<TodoEntry>>,
@@ -12,7 +14,8 @@ struct AppState {
 #[derive(Serialize, Deserialize, Clone)]
 struct TodoEntry {
     id: Option<String>,
-    date: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+    updated_at: Option<DateTime<Utc>>,
     title: String,
     status: TodoStatus,
 }
@@ -21,18 +24,12 @@ struct TodoEntry {
 enum TodoStatus {
     Pending,
     InProgress,
-    Done
+    Done,
 }
 
 #[get("/")]
 async fn index() -> String {
-    "Good health!".to_string()
-}
-
-async fn get_health_status() -> HttpResponse {
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .body("Healthy!")
+    "Welcome!".to_string()
 }
 
 #[actix_web::main]
@@ -41,12 +38,18 @@ async fn main() -> std::io::Result<()> {
         todo_entries: Mutex::new(vec![]),
     });
 
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+
     HttpServer::new(move || {
         App::new()
+            .wrap(Logger::default())
             .app_data(app_data.clone())
             .service(index)
-            .service(web::scope("/api").configure(service::config))
-            .route("/health", web::get().to(get_health_status))
+            .service(
+                web::scope("/api")
+                    .configure(todo::service::config)
+                    .configure(health::service::config),
+            )
     })
     .bind(("127.0.0.1", 8080))?
     .run()

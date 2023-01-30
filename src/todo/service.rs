@@ -37,7 +37,8 @@ async fn create(
     let id = Uuid::new_v4();
     todo_entries.push(TodoEntry {
         id: Some(id.to_string()),
-        date: Utc::now(),
+        created_at: Utc::now(),
+        updated_at: None,
         title: param_obj.title.clone(),
         status: TodoStatus::Pending,
     });
@@ -63,7 +64,7 @@ async fn update(
 
     let title = body.title.to_owned().unwrap_or(todo.title.to_owned());
     todo.title = title;
-    todo.date = Utc::now();
+    todo.updated_at = Some(Utc::now());
 
     HttpResponse::Ok().json(todo_entries.to_vec())
 }
@@ -83,10 +84,16 @@ async fn update_status(
 
     let todo = todo.unwrap();
     match todo.status {
-        TodoStatus::Pending => todo.status = TodoStatus::InProgress,
-        TodoStatus::InProgress => todo.status = TodoStatus::Done,
-        TodoStatus::Done => (),
-    }
+        TodoStatus::Pending => (
+            todo.status = TodoStatus::InProgress,
+            todo.updated_at = Some(Utc::now()),
+        ),
+        TodoStatus::InProgress => (
+            todo.status = TodoStatus::Done,
+            todo.updated_at = Some(Utc::now()),
+        ),
+        TodoStatus::Done => ((), ()),
+    };
 
     HttpResponse::Ok().json(todo_entries.to_vec())
 }
