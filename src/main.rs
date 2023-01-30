@@ -1,31 +1,19 @@
+#[macro_use] extern crate diesel;
+
+use actix::{SyncArbiter};
 use actix_web::{get, web, App, HttpServer, middleware::Logger};
 use env_logger::Env;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use dotenv::dotenv;
+use std::env;
+
+mod db_utils;
+mod schema;
 
 mod health;
-mod todo;
+mod account;
 
-struct AppState {
-    todo_entries: Mutex<Vec<TodoEntry>>,
-}
 
-#[derive(Serialize, Deserialize, Clone)]
-struct TodoEntry {
-    id: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: Option<DateTime<Utc>>,
-    title: String,
-    status: TodoStatus,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-enum TodoStatus {
-    Pending,
-    InProgress,
-    Done,
-}
+use db_utils::{get_pool, AppState, DbActor};
 
 #[get("/")]
 async fn index() -> String {
@@ -34,8 +22,13 @@ async fn index() -> String {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv().ok();
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = get_pool(&db_url);
+    let db_addr = SyncArbiter::start(5, move || DbActor(pool.clone()));
+
     let app_data = web::Data::new(AppState {
-        todo_entries: Mutex::new(vec![]),
+        db: db_addr.clone()
     });
 
     env_logger::init_from_env(Env::default().default_filter_or("info"));
@@ -47,7 +40,7 @@ async fn main() -> std::io::Result<()> {
             .service(index)
             .service(
                 web::scope("/api")
-                    .configure(todo::service::config)
+                    .configure(account::service::config)
                     .configure(health::service::config),
             )
     })

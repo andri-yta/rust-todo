@@ -5,22 +5,18 @@
 
 
 use chrono::NaiveDateTime;
-use diesel::{Queryable};
-use serde::Serialize;
-use uuid::Uuid;
-
-#[derive(Queryable, Debug, Serialize)]
+#[derive(Queryable, Debug, Identifiable)]
 #[diesel(primary_key(account_id))]
 pub struct Account {
-    pub account_id: Uuid,
+    pub account_id: i32,
     pub email: String,
 }
 
-#[derive(Queryable, Debug, Serialize)]
+#[derive(Queryable, Debug, Identifiable)]
 #[diesel(primary_key(todo_id))]
 pub struct Todo {
-    pub account_id: Uuid,
-    pub todo_id: Uuid,
+    pub account_id: Option<i32>,
+    pub todo_id: i32,
     pub created_at: NaiveDateTime,
     pub updated_at: Option<NaiveDateTime>,
     pub title: String,
